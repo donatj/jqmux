@@ -13,11 +13,16 @@ type handlerRecord struct {
 	handler http.Handler
 }
 
+// JqMux is an HTTP request multiplexer.
+// It matches the body of each incoming request against a list of registered
+// jq patterns and calls the handler for the first pattern that
+// matches given value.
 type JqMux struct {
 	handlers map[string][]handlerRecord
 	ops      map[string]jq.Op
 }
 
+// NewMux allocates and returns a new JqMux.
 func NewMux() *JqMux {
 	return &JqMux{
 		handlers: make(map[string][]handlerRecord),
@@ -25,6 +30,8 @@ func NewMux() *JqMux {
 	}
 }
 
+// Handle registers the handler for the given pattern and match value.
+// If the given jq pattern does not compile, Handle panics.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	if _, ok := mux.ops[pattern]; !ok {
 		op, err := jq.Parse(pattern)
@@ -40,6 +47,8 @@ func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	})
 }
 
+// HandleFunc is a convenience method which casts the given handler to
+// http.HandlerFunc and registers the casted handler
 func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWriter, *http.Request)) {
 	mux.Handle(pattern, match, http.HandlerFunc(handler))
 }
@@ -51,7 +60,7 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var h http.Handler = nil
+	var h http.Handler
 
 handlers:
 	for p, m := range mux.handlers {
