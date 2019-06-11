@@ -1,6 +1,8 @@
 # jqmux
 
+[![Build Status](https://travis-ci.org/donatj/jqmux.svg?branch=master)](https://travis-ci.org/donatj/jqmux)
 [![GoDoc](https://godoc.org/github.com/donatj/jqmux?status.svg)](https://godoc.org/github.com/donatj/jqmux)
+[![Go Report Card](https://goreportcard.com/badge/github.com/donatj/jqmux)](https://goreportcard.com/report/github.com/donatj/jqmux)
 
 An HTTP multiplexer, routing based on the requests JSON Body using [jq syntax](https://stedolan.github.io/jq/manual/) of JSON value filtering.
 
