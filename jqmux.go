@@ -9,7 +9,7 @@ import (
 )
 
 // Option sets an option of the passed JqMux
-type Option func(*JqMux) error
+type Option func(*JqMux)
 
 type handlerRecord struct {
 	match   string
@@ -29,9 +29,8 @@ type JqMux struct {
 
 // OptionErrorHandler configures a custom error handler
 func OptionErrorHandler(handler func(error) http.Handler) Option {
-	return func(mux *JqMux) error {
+	return func(mux *JqMux) {
 		mux.errorHandler = handler
-		return nil
 	}
 }
 
