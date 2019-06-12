@@ -8,6 +8,9 @@ import (
 	"github.com/savaki/jq"
 )
 
+// Option sets an option of the passed JqMux
+type Option func(*JqMux) error
+
 type handlerRecord struct {
 	match   string
 	handler http.Handler
@@ -20,14 +23,39 @@ type handlerRecord struct {
 type JqMux struct {
 	handlers map[string][]handlerRecord
 	ops      map[string]jq.Op
+
+	errorHandler func(error) http.Handler
+}
+
+// OptionErrorHandler configures a custom error handler
+func OptionErrorHandler(handler func(error) http.Handler) Option {
+	return func(mux *JqMux) error {
+		mux.errorHandler = handler
+		return nil
+	}
+}
+
+// DefaultErrorHandler is the default error handler when calling NewMux
+func DefaultErrorHandler(err error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	})
 }
 
 // NewMux allocates and returns a new JqMux.
-func NewMux() *JqMux {
-	return &JqMux{
+func NewMux(options ...Option) *JqMux {
+	mux := &JqMux{
 		handlers: make(map[string][]handlerRecord),
 		ops:      make(map[string]jq.Op),
+
+		errorHandler: DefaultErrorHandler,
 	}
+
+	for _, option := range options {
+		option(mux)
+	}
+
+	return mux
 }
 
 // Handle registers the handler for the given pattern and match value.
@@ -56,7 +84,7 @@ func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWr
 func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		mux.errorHandler(err).ServeHTTP(w, r)
 		return
 	}
 
