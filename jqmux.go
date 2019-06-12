@@ -24,13 +24,21 @@ type JqMux struct {
 	handlers map[string][]handlerRecord
 	ops      map[string]jq.Op
 
-	errorHandler func(error) http.Handler
+	errorHandler    func(error) http.Handler
+	notFoundHandler http.Handler
 }
 
 // OptionErrorHandler configures a custom error handler
 func OptionErrorHandler(handler func(error) http.Handler) Option {
 	return func(mux *JqMux) {
 		mux.errorHandler = handler
+	}
+}
+
+// OptionNotFoundHandler configures the http.Hander called on no matches
+func OptionNotFoundHandler(handler http.Handler) Option {
+	return func(mux *JqMux) {
+		mux.notFoundHandler = handler
 	}
 }
 
@@ -41,13 +49,19 @@ func DefaultErrorHandler(err error) http.Handler {
 	})
 }
 
+// DefaultNotFoundHandler is the default http.Handler when calling NewMux
+func DefaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	http.NotFound(w, r)
+}
+
 // NewMux allocates and returns a new JqMux.
 func NewMux(options ...Option) *JqMux {
 	mux := &JqMux{
 		handlers: make(map[string][]handlerRecord),
 		ops:      make(map[string]jq.Op),
 
-		errorHandler: DefaultErrorHandler,
+		errorHandler:    DefaultErrorHandler,
+		notFoundHandler: http.HandlerFunc(DefaultNotFoundHandler),
 	}
 
 	for _, option := range options {
