@@ -4,9 +4,9 @@
 [![GoDoc](https://godoc.org/github.com/donatj/jqmux?status.svg)](https://godoc.org/github.com/donatj/jqmux)
 [![Go Report Card](https://goreportcard.com/badge/github.com/donatj/jqmux)](https://goreportcard.com/report/github.com/donatj/jqmux)
 
-An HTTP multiplexer, routing based on the requests JSON Body using [jq syntax](https://stedolan.github.io/jq/manual/) of JSON value filtering.
+An HTTP multiplexer, routing based on the requests JSON Body using the [jq syntax](https://stedolan.github.io/jq/manual/) of JSON value filtering.
 
-A particularly powerful usecase for this is webhook routing.
+A particularly fruitful usecase for this is webhook routing.
 
 This utilizes the library [github.com/savaki/jq](https://github.com/savaki/jq) and more information about expected values can be found there.
 
