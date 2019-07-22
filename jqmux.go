@@ -1,5 +1,5 @@
 // Package jqmux offers an HTTP multiplexer which routes based on the incoming
-// requests JSON Body using the jq syntax of JSON value filtering
+// requests JSON body using the jq syntax of JSON value filtering
 //
 // Limitations
 //
