@@ -105,8 +105,7 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 handlers:
 	for p, m := range mux.handlers {
-		_ = m
-		op, _ := mux.ops[p]
+		op := mux.ops[p]
 		v, err := op.Apply(b)
 		if err != nil {
 			continue
