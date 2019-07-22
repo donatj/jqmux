@@ -13,7 +13,9 @@ func TestNoBodyJSONMatchEmpty(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	x := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			t.Error("write failed")
+		}
 	})
 
 	jqm := NewMux()
@@ -36,11 +38,15 @@ func TestBasicExample(t *testing.T) {
 	mux := NewMux()
 
 	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`it opened`))
+		if _, err := w.Write([]byte(`it opened`)); err != nil {
+			t.Error("write failed")
+		}
 	})
 
 	mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`it synchronized`))
+		if _, err := w.Write([]byte(`it synchronized`)); err != nil {
+			t.Error("write failed")
+		}
 	})
 
 	tt := []struct {
