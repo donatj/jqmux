@@ -8,7 +8,9 @@ An HTTP multiplexer which routes based on the incoming requests JSON body using 
 
 A particularly fruitful usecase for this is webhook routing.
 
-This utilizes the library [github.com/savaki/jq](https://github.com/savaki/jq) and more information about expected values can be found there.
+## Limitations
+
+This utilizes the library [github.com/savaki/jq](https://github.com/savaki/jq) for it's jq parsing. While it is very fast it is not fully featured, so more complicated jq queries might not work. More information about it's workings and expected values can be found there.
 
 ## Example
 
