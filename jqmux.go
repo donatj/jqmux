@@ -111,31 +111,37 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 handlers:
 	for p, m := range mux.handlers {
-		var vs string
-
-		if len(b) == 0 || jsonErr != nil {
-			vs = ""
+		if len(b) == 0 {
+			for _, hr := range m {
+				if hr.match == "" {
+					h = hr.handler
+					break handlers
+				}
+			}
+		} else if jsonErr != nil {
+			break handlers
 		} else {
 			query := mux.queries[p]
 			iter := query.Run(input)
-			v, ok := iter.Next()
-			if !ok {
-				continue
-			}
-			if _, ok := v.(error); ok {
-				continue
-			}
-			result, err := json.Marshal(v)
-			if err != nil {
-				continue
-			}
-			vs = string(result)
-		}
-
-		for _, hr := range m {
-			if hr.match == vs {
-				h = hr.handler
-				break handlers
+			for {
+				v, ok := iter.Next()
+				if !ok {
+					break
+				}
+				if _, ok := v.(error); ok {
+					continue
+				}
+				result, err := json.Marshal(v)
+				if err != nil {
+					continue
+				}
+				vs := string(result)
+				for _, hr := range m {
+					if hr.match == vs {
+						h = hr.handler
+						break handlers
+					}
+				}
 			}
 		}
 	}

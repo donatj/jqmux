@@ -349,6 +349,62 @@ func TestArrayIndexMatch(t *testing.T) {
 	}
 }
 
+// TestInvalidJSONNotFound verifies that a non-empty invalid JSON body is routed
+// to the not-found handler rather than being treated like an empty body.
+func TestInvalidJSONNotFound(t *testing.T) {
+	mux := NewMux()
+	mux.HandleFunc(".", "", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("empty match"))
+	})
+
+	req, _ := http.NewRequest("POST", "localhost", bytes.NewReader([]byte(`{invalid`)))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	res := rec.Result()
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNotFound {
+		t.Errorf("expected status %d for invalid JSON; got %d", http.StatusNotFound, res.StatusCode)
+	}
+}
+
+// TestMultiValueIterator verifies that routes are matched against all values
+// produced by a jq expression that yields multiple results (e.g. .items[]).
+func TestMultiValueIterator(t *testing.T) {
+	mux := NewMux()
+	mux.HandleFunc(`.items[]`, `"target"`, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("found"))
+	})
+
+	tt := []struct {
+		body   string
+		output string
+		status int
+	}{
+		{`{"items":["other","target"]}`, "found", http.StatusOK},
+		{`{"items":["a","b","c"]}`, "404 page not found\n", http.StatusNotFound},
+	}
+
+	for _, tc := range tt {
+		req, _ := http.NewRequest("POST", "localhost", bytes.NewReader([]byte(tc.body)))
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		res := rec.Result()
+		if res.StatusCode != tc.status {
+			res.Body.Close()
+			t.Errorf("body=%q: expected status %d; got %d", tc.body, tc.status, res.StatusCode)
+			continue
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if string(body) != tc.output {
+			t.Errorf("body=%q: expected %q; got %q", tc.body, tc.output, body)
+		}
+	}
+}
+
 // TestMultiplePatterns verifies that multiple distinct jq patterns can be
 // registered simultaneously and each routes correctly.
 func TestMultiplePatterns(t *testing.T) {
