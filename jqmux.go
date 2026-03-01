@@ -104,7 +104,7 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input interface{}
+	var input any
 	jsonErr := json.Unmarshal(b, &input)
 
 	var h http.Handler
