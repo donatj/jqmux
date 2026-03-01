@@ -148,5 +148,5 @@ handlers:
 		return
 	}
 
-	http.NotFound(w, r)
+	mux.notFoundHandler.ServeHTTP(w, r)
 }
