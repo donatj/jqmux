@@ -24,6 +24,7 @@ func TestNoBodyJSONMatchEmpty(t *testing.T) {
 	jqm.ServeHTTP(rec, req)
 
 	res := rec.Result()
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("expected status %d; got %d", http.StatusOK, res.StatusCode)
 	}
@@ -70,6 +71,7 @@ func TestBasicExample(t *testing.T) {
 		mux.ServeHTTP(rec, req)
 
 		res := rec.Result()
+		defer res.Body.Close()
 		if res.StatusCode != tc.status {
 			t.Errorf("expected status %d; got %d", tc.status, res.StatusCode)
 		}
