@@ -2,7 +2,7 @@ package jqmux
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,11 +24,12 @@ func TestNoBodyJSONMatchEmpty(t *testing.T) {
 	jqm.ServeHTTP(rec, req)
 
 	res := rec.Result()
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("expected status %d; got %d", http.StatusOK, res.StatusCode)
 	}
 
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 	if string(body) != "ok" {
 		t.Errorf(`expected body "ok"; got: %s`, body)
 	}
@@ -70,11 +71,12 @@ func TestBasicExample(t *testing.T) {
 		mux.ServeHTTP(rec, req)
 
 		res := rec.Result()
+		defer res.Body.Close()
 		if res.StatusCode != tc.status {
 			t.Errorf("expected status %d; got %d", tc.status, res.StatusCode)
 		}
 
-		body, _ := ioutil.ReadAll(res.Body)
+		body, _ := io.ReadAll(res.Body)
 		if string(body) != tc.output {
 			t.Errorf(`expected body "%s"; got: "%s"`, tc.output, body)
 		}
