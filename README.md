@@ -1,6 +1,6 @@
 # jqmux
 
-[![Build Status](https://travis-ci.org/donatj/jqmux.svg?branch=master)](https://travis-ci.org/donatj/jqmux)
+[![CI](https://github.com/donatj/jqmux/actions/workflows/ci.yml/badge.svg)](https://github.com/donatj/jqmux/actions/workflows/ci.yml)
 [![GoDoc](https://godoc.org/github.com/donatj/jqmux?status.svg)](https://godoc.org/github.com/donatj/jqmux)
 [![Go Report Card](https://goreportcard.com/badge/github.com/donatj/jqmux)](https://goreportcard.com/report/github.com/donatj/jqmux)
 
