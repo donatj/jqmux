@@ -1,17 +1,14 @@
 // Package jqmux offers an HTTP multiplexer which routes based on the incoming
 // requests JSON body using the jq syntax of JSON value filtering
-//
-// # Limitations
-//
-// * Supports jq syntax to the level of https://github.com/savaki/jq
 package jqmux
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 
-	"github.com/savaki/jq"
+	"github.com/itchyny/gojq"
 )
 
 // Option sets an option of the passed JqMux
@@ -28,7 +25,7 @@ type handlerRecord struct {
 // matches given value.
 type JqMux struct {
 	handlers map[string][]handlerRecord
-	ops      map[string]jq.Op
+	queries  map[string]*gojq.Query
 
 	errorHandler    func(error) http.Handler
 	notFoundHandler http.Handler
@@ -64,7 +61,7 @@ func DefaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
 func NewMux(options ...Option) *JqMux {
 	mux := &JqMux{
 		handlers: make(map[string][]handlerRecord),
-		ops:      make(map[string]jq.Op),
+		queries:  make(map[string]*gojq.Query),
 
 		errorHandler:    DefaultErrorHandler,
 		notFoundHandler: http.HandlerFunc(DefaultNotFoundHandler),
@@ -80,13 +77,13 @@ func NewMux(options ...Option) *JqMux {
 // Handle registers the handler for the given pattern and match value.
 // If the given jq pattern does not compile, Handle panics.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
-	if _, ok := mux.ops[pattern]; !ok {
-		op, err := jq.Parse(pattern)
+	if _, ok := mux.queries[pattern]; !ok {
+		query, err := gojq.Parse(pattern)
 		if err != nil {
 			panic(err)
 		}
 
-		mux.ops[pattern] = op
+		mux.queries[pattern] = query
 	}
 
 	mux.handlers[pattern] = append(mux.handlers[pattern], handlerRecord{
@@ -107,17 +104,33 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var input interface{}
+	jsonErr := json.Unmarshal(b, &input)
+
 	var h http.Handler
 
 handlers:
 	for p, m := range mux.handlers {
-		op := mux.ops[p]
-		v, err := op.Apply(b)
-		if err != nil {
-			continue
-		}
+		var vs string
 
-		vs := string(v)
+		if len(b) == 0 || jsonErr != nil {
+			vs = ""
+		} else {
+			query := mux.queries[p]
+			iter := query.Run(input)
+			v, ok := iter.Next()
+			if !ok {
+				continue
+			}
+			if _, ok := v.(error); ok {
+				continue
+			}
+			result, err := json.Marshal(v)
+			if err != nil {
+				continue
+			}
+			vs = string(result)
+		}
 
 		for _, hr := range m {
 			if hr.match == vs {
