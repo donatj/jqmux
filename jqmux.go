@@ -1,15 +1,14 @@
 // Package jqmux offers an HTTP multiplexer which routes based on the incoming
 // requests JSON body using the jq syntax of JSON value filtering
 //
-// Limitations
+// # Limitations
 //
 // * Supports jq syntax to the level of https://github.com/savaki/jq
-//
 package jqmux
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/savaki/jq"
@@ -102,7 +101,7 @@ func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWr
 }
 
 func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		mux.errorHandler(err).ServeHTTP(w, r)
 		return
@@ -129,7 +128,7 @@ handlers:
 	}
 
 	r.Body.Close()
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+	r.Body = io.NopCloser(bytes.NewBuffer(b))
 
 	if h != nil {
 		h.ServeHTTP(w, r)
