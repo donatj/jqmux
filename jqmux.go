@@ -1,5 +1,14 @@
-// Package jqmux offers an HTTP multiplexer which routes based on the incoming
-// requests JSON body using the jq syntax of JSON value filtering.
+// Package jqmux routes HTTP requests according to their JSON bodies using jq
+// filters.
+//
+// A JqMux evaluates registered filters against a request body and dispatches
+// the request when a filter's first result matches a registered JSON value.
+// For example, the filter ".action" with the match value `"opened"` matches
+// the body `{"action":"opened"}`.
+//
+// Register handlers before serving requests. Invalid filters panic during
+// registration, while invalid JSON and unmatched requests are sent to the
+// configured not-found handler.
 package jqmux
 
 import (
@@ -11,7 +20,7 @@ import (
 	"github.com/itchyny/gojq"
 )
 
-// Option sets an option of the passed JqMux
+// Option configures a JqMux created by NewMux.
 type Option func(*JqMux)
 
 type handlerRecord struct {
@@ -19,10 +28,11 @@ type handlerRecord struct {
 	handler http.Handler
 }
 
-// JqMux is an HTTP request multiplexer.
-// It matches the body of each incoming request against a list of registered
-// jq patterns and calls the handler for the first pattern that
-// matches given value.
+// JqMux is an HTTP request multiplexer that routes on JSON request bodies.
+//
+// Each registered jq filter is compiled once and reused for subsequent
+// requests. JqMux restores the request body before invoking a matched or
+// not-found handler, so handlers can read it normally.
 type JqMux struct {
 	handlers map[string][]handlerRecord
 	codes    map[string]*gojq.Code
@@ -31,33 +41,37 @@ type JqMux struct {
 	notFoundHandler http.Handler
 }
 
-// OptionErrorHandler configures a custom error handler
+// OptionErrorHandler sets the handler factory used when JqMux cannot read a
+// request body.
 func OptionErrorHandler(handler func(error) http.Handler) Option {
 	return func(mux *JqMux) {
 		mux.errorHandler = handler
 	}
 }
 
-// OptionNotFoundHandler configures the http.Handler called on no matches.
+// OptionNotFoundHandler sets the handler called when a request body is invalid
+// JSON or does not match any registered rule.
 func OptionNotFoundHandler(handler http.Handler) Option {
 	return func(mux *JqMux) {
 		mux.notFoundHandler = handler
 	}
 }
 
-// DefaultErrorHandler is the default error handler when calling NewMux
+// DefaultErrorHandler returns the default handler for request-body read errors.
+// It responds with the error text and status 500.
 func DefaultErrorHandler(err error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	})
 }
 
-// DefaultNotFoundHandler is the default http.Handler when calling NewMux
+// DefaultNotFoundHandler writes the standard HTTP 404 response.
 func DefaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// NewMux allocates and returns a new JqMux.
+// NewMux returns a new JqMux configured with DefaultErrorHandler and
+// DefaultNotFoundHandler. Options override those defaults.
 func NewMux(options ...Option) *JqMux {
 	mux := &JqMux{
 		handlers: make(map[string][]handlerRecord),
@@ -74,8 +88,12 @@ func NewMux(options ...Option) *JqMux {
 	return mux
 }
 
-// Handle registers the handler for the given pattern and match value.
-// It panics when the jq pattern cannot be compiled.
+// Handle registers handler for a jq pattern and match value.
+//
+// The first value emitted by pattern is JSON-encoded and compared with match.
+// Match must therefore use JSON syntax: strings include quotes, while numbers,
+// booleans, and null do not. Handle panics if pattern cannot be parsed or
+// compiled.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	if _, ok := mux.codes[pattern]; !ok {
 		query, err := gojq.Parse(pattern)
@@ -96,12 +114,13 @@ func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	})
 }
 
-// HandleFunc is a convenience method which casts the given handler to
-// http.HandlerFunc and registers the casted handler
+// HandleFunc registers handler as a function with the same behavior as Handle.
 func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWriter, *http.Request)) {
 	mux.Handle(pattern, match, http.HandlerFunc(handler))
 }
 
+// ServeHTTP routes r according to its JSON body. It restores the body before
+// invoking the selected handler or the configured not-found handler.
 func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
