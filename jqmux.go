@@ -75,17 +75,17 @@ func NewMux(options ...Option) *JqMux {
 }
 
 // Handle registers the handler for the given pattern and match value.
-// It returns an error when the jq pattern cannot be compiled.
-func (mux *JqMux) Handle(pattern, match string, handler http.Handler) error {
+// It panics when the jq pattern cannot be compiled.
+func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	if _, ok := mux.codes[pattern]; !ok {
 		query, err := gojq.Parse(pattern)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		code, err := gojq.Compile(query)
 		if err != nil {
-			return err
+			panic(err)
 		}
 
 		mux.codes[pattern] = code
@@ -94,14 +94,12 @@ func (mux *JqMux) Handle(pattern, match string, handler http.Handler) error {
 	mux.handlers[pattern] = append(mux.handlers[pattern], handlerRecord{
 		match, handler,
 	})
-
-	return nil
 }
 
 // HandleFunc is a convenience method which casts the given handler to
 // http.HandlerFunc and registers the casted handler
-func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWriter, *http.Request)) error {
-	return mux.Handle(pattern, match, http.HandlerFunc(handler))
+func (mux *JqMux) HandleFunc(pattern, match string, handler func(http.ResponseWriter, *http.Request)) {
+	mux.Handle(pattern, match, http.HandlerFunc(handler))
 }
 
 func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -18,7 +18,6 @@ The first handler is executed if the body matches `{"action": "opened"}` whereas
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/donatj/jqmux"
@@ -27,17 +26,13 @@ import (
 func main() {
 	mux := jqmux.NewMux()
 
-	if err := mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`body "action" was "opened"`))
-	}); err != nil {
-		log.Fatal(err)
-	}
+	})
 
-	if err := mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`body "action" was "synchronize"`))
-	}); err != nil {
-		log.Fatal(err)
-	}
+	})
 
 	http.ListenAndServe(":80", mux)
 }

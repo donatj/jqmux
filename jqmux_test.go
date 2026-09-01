@@ -20,9 +20,7 @@ func TestNoBodyJSONMatchEmpty(t *testing.T) {
 
 	jqm := NewMux()
 
-	if err := jqm.Handle(".", "", x); err != nil {
-		t.Fatal(err)
-	}
+	jqm.Handle(".", "", x)
 	jqm.ServeHTTP(rec, req)
 
 	res := rec.Result()
@@ -40,21 +38,17 @@ func TestNoBodyJSONMatchEmpty(t *testing.T) {
 func TestBasicExample(t *testing.T) {
 	mux := NewMux()
 
-	if err := mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte(`it opened`)); err != nil {
 			t.Error("write failed")
 		}
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
-	if err := mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte(`it synchronized`)); err != nil {
 			t.Error("write failed")
 		}
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	tt := []struct {
 		body   string
@@ -93,15 +87,13 @@ func TestRequestBodyPreserved(t *testing.T) {
 	const payload = `{"action":"opened"}`
 
 	mux := NewMux()
-	if err := mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
 		_, _ = w.Write(b)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(payload))
 	rec := httptest.NewRecorder()
@@ -116,9 +108,7 @@ func TestOptionNotFoundHandler(t *testing.T) {
 	mux := NewMux(OptionNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})))
-	if err := mux.HandleFunc(`.action`, `"opened"`, func(http.ResponseWriter, *http.Request) {}); err != nil {
-		t.Fatal(err)
-	}
+	mux.HandleFunc(`.action`, `"opened"`, func(http.ResponseWriter, *http.Request) {})
 
 	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(`{"action":"other"}`))
 	rec := httptest.NewRecorder()
@@ -129,22 +119,23 @@ func TestOptionNotFoundHandler(t *testing.T) {
 	}
 }
 
-func TestHandleInvalidPattern(t *testing.T) {
+func TestHandleInvalidPatternPanics(t *testing.T) {
 	mux := NewMux()
-	if err := mux.Handle(`.action |`, `"opened"`, http.NotFoundHandler()); err == nil {
-		t.Fatal("Handle returned nil error for an invalid jq pattern")
-	}
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Handle did not panic for an invalid jq pattern")
+		}
+	}()
+	mux.Handle(`.action |`, `"opened"`, http.NotFoundHandler())
 }
 
 func TestLargeNumberMatch(t *testing.T) {
 	const number = "4722366482869645213696"
 
 	mux := NewMux()
-	if err := mux.HandleFunc(`.id`, number, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(`.id`, number, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 
 	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(`{"id":`+number+`}`))
 	rec := httptest.NewRecorder()
