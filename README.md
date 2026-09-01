@@ -10,6 +10,8 @@ A particularly fruitful usecase for this is webhook routing.
 
 This uses [gojq](https://github.com/itchyny/gojq), a pure-Go jq implementation. Its supported syntax and behavioral differences from jq are documented in that project.
 
+Filters are compiled when registered. `Handle` and `HandleFunc` panic when a filter is invalid, so configuration errors surface during application startup rather than while serving requests.
+
 ## Example
 
 The first handler is executed if the body matches `{"action": "opened"}` whereas the second is executed if the body matches `{"action": "synchronize"}`
