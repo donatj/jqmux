@@ -24,8 +24,9 @@ type handlerRecord struct {
 // jq patterns and calls the handler for the first pattern that
 // matches given value.
 type JqMux struct {
-	handlers map[string][]handlerRecord
-	queries  map[string]*gojq.Query
+	handlers    map[string][]handlerRecord
+	queries     map[string]*gojq.Query
+	parseErrors map[string]error
 
 	errorHandler    func(error) http.Handler
 	notFoundHandler http.Handler
@@ -38,7 +39,7 @@ func OptionErrorHandler(handler func(error) http.Handler) Option {
 	}
 }
 
-// OptionNotFoundHandler configures the http.Hander called on no matches
+// OptionNotFoundHandler configures the http.Handler called on no matches
 func OptionNotFoundHandler(handler http.Handler) Option {
 	return func(mux *JqMux) {
 		mux.notFoundHandler = handler
@@ -60,8 +61,9 @@ func DefaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
 // NewMux allocates and returns a new JqMux.
 func NewMux(options ...Option) *JqMux {
 	mux := &JqMux{
-		handlers: make(map[string][]handlerRecord),
-		queries:  make(map[string]*gojq.Query),
+		handlers:    make(map[string][]handlerRecord),
+		queries:     make(map[string]*gojq.Query),
+		parseErrors: make(map[string]error),
 
 		errorHandler:    DefaultErrorHandler,
 		notFoundHandler: http.HandlerFunc(DefaultNotFoundHandler),
@@ -75,15 +77,18 @@ func NewMux(options ...Option) *JqMux {
 }
 
 // Handle registers the handler for the given pattern and match value.
-// If the given jq pattern does not compile, Handle panics.
+// If the jq pattern does not compile, any request reaching this route will
+// be served a 500 error via the configured error handler.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	if _, ok := mux.queries[pattern]; !ok {
-		query, err := gojq.Parse(pattern)
-		if err != nil {
-			panic(err)
+		if _, alreadyFailed := mux.parseErrors[pattern]; !alreadyFailed {
+			query, err := gojq.Parse(pattern)
+			if err != nil {
+				mux.parseErrors[pattern] = err
+			} else {
+				mux.queries[pattern] = query
+			}
 		}
-
-		mux.queries[pattern] = query
 	}
 
 	mux.handlers[pattern] = append(mux.handlers[pattern], handlerRecord{
@@ -111,6 +116,11 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 handlers:
 	for p, m := range mux.handlers {
+		if parseErr, bad := mux.parseErrors[p]; bad {
+			h = mux.errorHandler(parseErr)
+			break handlers
+		}
+
 		if len(b) == 0 {
 			for _, hr := range m {
 				if hr.match == "" {

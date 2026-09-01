@@ -173,16 +173,35 @@ type errReader struct{ err error }
 
 func (e *errReader) Read([]byte) (int, error) { return 0, e.err }
 
-// TestHandlePanic verifies that registering an invalid jq pattern panics.
-func TestHandlePanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for invalid jq pattern")
-		}
-	}()
-
+// TestHandleInvalidPattern verifies that registering an invalid jq pattern
+// does not panic, and instead causes requests to receive a 500 error.
+func TestHandleInvalidPattern(t *testing.T) {
 	mux := NewMux()
 	mux.Handle("this is not valid jq %%", "x", http.NotFoundHandler())
+
+	tt := []struct {
+		name string
+		body string
+	}{
+		{"valid JSON body", `{"foo":"bar"}`},
+		{"empty body", ``},
+		{"invalid JSON body", `{invalid`},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", "localhost", bytes.NewReader([]byte(tc.body)))
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			res := rec.Result()
+			defer res.Body.Close()
+
+			if res.StatusCode != http.StatusInternalServerError {
+				t.Errorf("expected status %d for invalid jq pattern; got %d", http.StatusInternalServerError, res.StatusCode)
+			}
+		})
+	}
 }
 
 // TestNumericMatch verifies routing on numeric JSON values.
