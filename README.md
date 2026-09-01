@@ -8,9 +8,7 @@ An HTTP multiplexer which routes based on the incoming requests JSON body using 
 
 A particularly fruitful usecase for this is webhook routing.
 
-## Limitations
-
-This utilizes the library [github.com/savaki/jq](https://github.com/savaki/jq) for it's jq parsing. While it is very fast it is not fully featured, so more complicated jq queries might not work. More information about it's workings and expected values can be found there.
+This uses [gojq](https://github.com/itchyny/gojq), a pure-Go jq implementation. Its supported syntax and behavioral differences from jq are documented in that project.
 
 ## Example
 
@@ -20,6 +18,7 @@ The first handler is executed if the body matches `{"action": "opened"}` whereas
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/donatj/jqmux"
@@ -28,13 +27,17 @@ import (
 func main() {
 	mux := jqmux.NewMux()
 
-	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
+	if err := mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`body "action" was "opened"`))
-	})
+	}); err != nil {
+		log.Fatal(err)
+	}
 
-	mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
+	if err := mux.HandleFunc(`.action`, `"synchronize"`, func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`body "action" was "synchronize"`))
-	})
+	}); err != nil {
+		log.Fatal(err)
+	}
 
 	http.ListenAndServe(":80", mux)
 }
