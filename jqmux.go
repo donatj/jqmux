@@ -1,17 +1,14 @@
 // Package jqmux offers an HTTP multiplexer which routes based on the incoming
-// requests JSON body using the jq syntax of JSON value filtering
-//
-// # Limitations
-//
-// * Supports jq syntax to the level of https://github.com/savaki/jq
+// requests JSON body using the jq syntax of JSON value filtering.
 package jqmux
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 
-	"github.com/savaki/jq"
+	"github.com/itchyny/gojq"
 )
 
 // Option sets an option of the passed JqMux
@@ -28,7 +25,7 @@ type handlerRecord struct {
 // matches given value.
 type JqMux struct {
 	handlers map[string][]handlerRecord
-	ops      map[string]jq.Op
+	codes    map[string]*gojq.Code
 
 	errorHandler    func(error) http.Handler
 	notFoundHandler http.Handler
@@ -41,7 +38,7 @@ func OptionErrorHandler(handler func(error) http.Handler) Option {
 	}
 }
 
-// OptionNotFoundHandler configures the http.Hander called on no matches
+// OptionNotFoundHandler configures the http.Handler called on no matches.
 func OptionNotFoundHandler(handler http.Handler) Option {
 	return func(mux *JqMux) {
 		mux.notFoundHandler = handler
@@ -64,7 +61,7 @@ func DefaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
 func NewMux(options ...Option) *JqMux {
 	mux := &JqMux{
 		handlers: make(map[string][]handlerRecord),
-		ops:      make(map[string]jq.Op),
+		codes:    make(map[string]*gojq.Code),
 
 		errorHandler:    DefaultErrorHandler,
 		notFoundHandler: http.HandlerFunc(DefaultNotFoundHandler),
@@ -78,15 +75,20 @@ func NewMux(options ...Option) *JqMux {
 }
 
 // Handle registers the handler for the given pattern and match value.
-// If the given jq pattern does not compile, Handle panics.
+// It panics when the jq pattern cannot be compiled.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
-	if _, ok := mux.ops[pattern]; !ok {
-		op, err := jq.Parse(pattern)
+	if _, ok := mux.codes[pattern]; !ok {
+		query, err := gojq.Parse(pattern)
 		if err != nil {
 			panic(err)
 		}
 
-		mux.ops[pattern] = op
+		code, err := gojq.Compile(query)
+		if err != nil {
+			panic(err)
+		}
+
+		mux.codes[pattern] = code
 	}
 
 	mux.handlers[pattern] = append(mux.handlers[pattern], handlerRecord{
@@ -107,33 +109,58 @@ func (mux *JqMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var input any
+	validJSON := len(b) == 0 || json.Valid(b)
+	if validJSON && len(b) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(b))
+		decoder.UseNumber()
+		if err := decoder.Decode(&input); err != nil {
+			validJSON = false
+		}
+	}
 	var h http.Handler
 
-handlers:
-	for p, m := range mux.handlers {
-		op := mux.ops[p]
-		v, err := op.Apply(b)
-		if err != nil {
-			continue
-		}
+	if validJSON {
+	handlers:
+		for p, m := range mux.handlers {
+			vs := ""
+			if len(b) > 0 {
+				iter := mux.codes[p].Run(input)
+				v, ok := iter.Next()
+				if !ok {
+					continue
+				}
+				if _, ok := v.(error); ok {
+					continue
+				}
 
-		vs := string(v)
+				result, err := json.Marshal(v)
+				if err != nil {
+					continue
+				}
+				vs = string(result)
+			}
 
-		for _, hr := range m {
-			if hr.match == vs {
-				h = hr.handler
-				break handlers
+			for _, hr := range m {
+				if hr.match == vs {
+					h = hr.handler
+					break handlers
+				}
 			}
 		}
 	}
 
-	r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewBuffer(b))
+	restoreBody(r, b)
 
 	if h != nil {
 		h.ServeHTTP(w, r)
 		return
 	}
 
-	http.NotFound(w, r)
+	mux.notFoundHandler.ServeHTTP(w, r)
+}
+
+func restoreBody(r *http.Request, b []byte) {
+	r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(b))
 }

@@ -82,3 +82,66 @@ func TestBasicExample(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestBodyPreserved(t *testing.T) {
+	const payload = `{"action":"opened"}`
+
+	mux := NewMux()
+	mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write(b)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(payload))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if got := rec.Body.String(); got != payload {
+		t.Errorf("handler received %q; want %q", got, payload)
+	}
+}
+
+func TestOptionNotFoundHandler(t *testing.T) {
+	mux := NewMux(OptionNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})))
+	mux.HandleFunc(`.action`, `"opened"`, func(http.ResponseWriter, *http.Request) {})
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(`{"action":"other"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if got := rec.Code; got != http.StatusTeapot {
+		t.Errorf("status = %d; want %d", got, http.StatusTeapot)
+	}
+}
+
+func TestHandleInvalidPatternPanics(t *testing.T) {
+	mux := NewMux()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Handle did not panic for an invalid jq pattern")
+		}
+	}()
+	mux.Handle(`.action |`, `"opened"`, http.NotFoundHandler())
+}
+
+func TestLargeNumberMatch(t *testing.T) {
+	const number = "4722366482869645213696"
+
+	mux := NewMux()
+	mux.HandleFunc(`.id`, number, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(`{"id":`+number+`}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if got := rec.Code; got != http.StatusNoContent {
+		t.Errorf("status = %d; want %d", got, http.StatusNoContent)
+	}
+}

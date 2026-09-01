@@ -8,9 +8,9 @@ An HTTP multiplexer which routes based on the incoming requests JSON body using 
 
 A particularly fruitful usecase for this is webhook routing.
 
-## Limitations
+This uses [gojq](https://github.com/itchyny/gojq), a pure-Go jq implementation. Its supported syntax and behavioral differences from jq are documented in that project.
 
-This utilizes the library [github.com/savaki/jq](https://github.com/savaki/jq) for it's jq parsing. While it is very fast it is not fully featured, so more complicated jq queries might not work. More information about it's workings and expected values can be found there.
+Filters are compiled when registered. `Handle` and `HandleFunc` panic when a filter is invalid, so configuration errors surface during application startup rather than while serving requests.
 
 ## Example
 

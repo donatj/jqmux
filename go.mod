@@ -1,7 +1,7 @@
 module github.com/donatj/jqmux
 
-go 1.26
+go 1.27
 
-toolchain go1.26.0
+require github.com/itchyny/gojq v0.12.18
 
-require github.com/savaki/jq v0.0.0-20161209013833-0e6baecebbf8
+require github.com/itchyny/timefmt-go v0.1.7 // indirect
