@@ -1,8 +1,6 @@
 module github.com/donatj/jqmux
 
-go 1.26
-
-toolchain go1.26.0
+go 1.27
 
 require github.com/itchyny/gojq v0.12.18
 
