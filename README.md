@@ -41,9 +41,16 @@ func main() {
 
 ## Routing rules
 
-Each rule runs a jq filter against the request body and compares its first
-result with the registered match value. Match values use JSON syntax, so string
-values include quotes while numbers, booleans, and `null` do not.
+For a non-empty JSON body, each rule runs a jq filter and compares its first
+result with the registered match value. The result is encoded with Go's
+`encoding/json.Marshal`. The match must equal that encoded text exactly,
+including escaping and whitespace. Strings include quotes. Numbers, booleans,
+and `null` do not. A filter that emits no value or returns an error as its first
+result does not match.
+
+An empty body matches an empty match string. If multiple patterns match, which
+pattern wins is unspecified. For the same pattern and match value, the first
+registered handler wins. Register all handlers before serving requests.
 
 ```go
 // Matches {"repository":{"visibility":"private"}}.
