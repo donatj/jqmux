@@ -1,14 +1,15 @@
 // Package jqmux routes HTTP requests according to their JSON bodies using jq
 // filters.
 //
-// A JqMux evaluates registered filters against a request body and dispatches
-// the request when a filter's first result matches a registered JSON value.
+// For a non-empty JSON body, a JqMux evaluates registered filters and dispatches
+// the request when a filter's first result matches a registered value.
 // For example, the filter ".action" with the match value `"opened"` matches
 // the body `{"action":"opened"}`.
 //
-// Register handlers before serving requests. Invalid filters panic during
-// registration, while invalid JSON and unmatched requests are sent to the
-// configured not-found handler.
+// An empty body matches a rule whose match value is the empty string. Filters
+// are not evaluated for an empty body. Register handlers before serving
+// requests. Invalid filters panic during registration. Invalid JSON and
+// unmatched requests go to the configured not-found handler.
 package jqmux
 
 import (
@@ -33,6 +34,10 @@ type handlerRecord struct {
 // Each registered jq filter is compiled once and reused for subsequent
 // requests. JqMux restores the request body before invoking a matched or
 // not-found handler, so handlers can read it normally.
+//
+// If multiple patterns match, the selected pattern is unspecified. For the
+// same pattern and match value, the first registered handler is selected.
+// Do not register handlers while requests are being served.
 type JqMux struct {
 	handlers map[string][]handlerRecord
 	codes    map[string]*gojq.Code
@@ -90,10 +95,14 @@ func NewMux(options ...Option) *JqMux {
 
 // Handle registers handler for a jq pattern and match value.
 //
-// The first value emitted by pattern is JSON-encoded and compared with match.
-// Match must therefore use JSON syntax: strings include quotes, while numbers,
-// booleans, and null do not. Handle panics if pattern cannot be parsed or
-// compiled.
+// For a non-empty JSON body, the first value emitted by pattern is encoded
+// with encoding/json.Marshal and compared to match as a string. Match must be
+// the exact encoded output, including escaping and whitespace. Strings include
+// quotes; numbers, booleans, and null do not. If the filter emits no value or
+// its first result is an error, the pattern does not match.
+//
+// For an empty body, pattern is not evaluated and match is compared with the
+// empty string. Handle panics if pattern cannot be parsed or compiled.
 func (mux *JqMux) Handle(pattern, match string, handler http.Handler) {
 	if _, ok := mux.codes[pattern]; !ok {
 		query, err := gojq.Parse(pattern)
