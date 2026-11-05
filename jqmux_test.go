@@ -145,3 +145,30 @@ func TestLargeNumberMatch(t *testing.T) {
 		t.Errorf("status = %d; want %d", got, http.StatusNoContent)
 	}
 }
+
+func TestRulesMatchInRegistrationOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"overlapping patterns", `{"action":"opened"}`},
+		{"empty body", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := NewMux()
+			mux.HandleFunc(`.action`, `"other"`, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(201) })
+			if tc.body == "" {
+				mux.HandleFunc(`.`, "", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(202) })
+				mux.HandleFunc(`.action`, "", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(203) })
+			} else {
+				mux.HandleFunc(`.action | ascii_upcase`, `"OPENED"`, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(202) })
+				mux.HandleFunc(`.action`, `"opened"`, func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(203) })
+			}
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(tc.body)))
+			if rec.Code != 202 {
+				t.Errorf("status = %d; want 202", rec.Code)
+			}
+		})
+	}
+}
