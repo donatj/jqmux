@@ -48,8 +48,7 @@ including escaping and whitespace. Strings include quotes. Numbers, booleans,
 and `null` do not. A filter that emits no value or returns an error as its first
 result does not match.
 
-An empty body matches an empty match string. If multiple patterns match, which
-pattern wins is unspecified. For the same pattern and match value, the first
+An empty body matches an empty match string. If multiple rules match, the first
 registered handler wins. Register all handlers before serving requests.
 
 ```go
