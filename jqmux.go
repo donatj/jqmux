@@ -6,10 +6,9 @@
 // For example, the filter ".action" with the match value `"opened"` matches
 // the body `{"action":"opened"}`.
 //
-// An empty body matches a rule whose match value is the empty string. Filters
-// are not evaluated for an empty body. Register handlers before serving
-// requests. Invalid filters panic during registration. Invalid JSON and
-// unmatched requests go to the configured not-found handler.
+// Register handlers before serving requests. Invalid filters panic during
+// registration. Invalid JSON and unmatched requests go to the configured
+// not-found handler. See [JqMux.Handle] for empty-body behavior.
 package jqmux
 
 import (
